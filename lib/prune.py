@@ -135,6 +135,10 @@ def prune_wanda(args, model, tokenizer, device=torch.device("cuda:0"), prune_n=0
         inps, outs, attention_mask, position_ids = prepare_calibration_input(model, dataloader, device)
 
     layers = model.model.layers
+    
+    param2name = {p: name for name, p in model.named_parameters()}
+    mask_dict = {}
+
     for i in range(len(layers)):
         layer = layers[i]
         subset = find_layers(layer)
@@ -200,6 +204,7 @@ def prune_wanda(args, model, tokenizer, device=torch.device("cuda:0"), prune_n=0
                     W_mask.scatter_(1, indices, True)
 
             subset[name].weight.data[W_mask] = 0  ## set weights to zero 
+            mask_dict[param2name[subset[name].weight]] = W_mask.detach().clone().cpu().bool()
 
         for j in range(args.nsamples):
             with torch.no_grad():
@@ -208,6 +213,7 @@ def prune_wanda(args, model, tokenizer, device=torch.device("cuda:0"), prune_n=0
 
     model.config.use_cache = use_cache 
     torch.cuda.empty_cache()
+    return mask_dict
 
 
 @torch.no_grad()

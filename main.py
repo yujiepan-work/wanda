@@ -65,10 +65,11 @@ def main():
     sparsity_ratio_original = check_sparsity(model)
     print('original sparsity: ', sparsity_ratio_original)
 
+    mask_dict = None
     if args.sparsity_ratio != 0:
         print("pruning starts")
         if args.prune_method == "wanda":
-            prune_wanda(args, model, tokenizer, device, prune_n=prune_n, prune_m=prune_m)
+            mask_dict = prune_wanda(args, model, tokenizer, device, prune_n=prune_n, prune_m=prune_m)
         elif args.prune_method == "magnitude":
             prune_magnitude(args, model, tokenizer, device, prune_n=prune_n, prune_m=prune_m)
         elif args.prune_method == "sparsegpt":
@@ -85,6 +86,8 @@ def main():
 
     if not os.path.exists(args.save):
         os.makedirs(args.save)
+        if mask_dict is not None:
+            torch.save(mask_dict, os.path.join(args.save, 'mask_dict.pt'))
     save_filepath = os.path.join(args.save, "log.txt")
     with open(save_filepath, "w") as f:
         print("actual_sparsity\tppl", file=f, flush=True)
