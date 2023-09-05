@@ -75,6 +75,11 @@ def main():
         elif args.prune_method == "sparsegpt":
             prune_sparsegpt(args, model, tokenizer, device, prune_n=prune_n, prune_m=prune_m)
 
+    if not os.path.exists(args.save):
+        os.makedirs(args.save)
+    if mask_dict is not None:
+        np.savez_compressed(os.path.join(args.save, 'mask_dict.npz'), **mask_dict)
+
     ################################################################
     print("*" * 30)
     sparsity_ratio = check_sparsity(model)
@@ -84,10 +89,6 @@ def main():
     ppl = eval_ppl(model, tokenizer, device)
     print(f"ppl on wikitext {ppl}")
 
-    if not os.path.exists(args.save):
-        os.makedirs(args.save)
-        if mask_dict is not None:
-            torch.save(mask_dict, os.path.join(args.save, 'mask_dict.pt'))
     save_filepath = os.path.join(args.save, "log.txt")
     with open(save_filepath, "w") as f:
         print("actual_sparsity\tppl", file=f, flush=True)

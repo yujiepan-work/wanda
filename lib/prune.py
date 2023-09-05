@@ -204,7 +204,7 @@ def prune_wanda(args, model, tokenizer, device=torch.device("cuda:0"), prune_n=0
                     W_mask.scatter_(1, indices, True)
 
             subset[name].weight.data[W_mask] = 0  ## set weights to zero 
-            mask_dict[param2name[subset[name].weight]] = W_mask.detach().clone().cpu().bool()
+            mask_dict[param2name[subset[name].weight]] = W_mask.detach().clone().cpu().bool().numpy()
 
         for j in range(args.nsamples):
             with torch.no_grad():
