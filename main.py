@@ -1,5 +1,5 @@
 import argparse
-import os 
+import os
 import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -13,17 +13,19 @@ print('transformers', version('transformers'))
 print('accelerate', version('accelerate'))
 print('# of gpus: ', torch.cuda.device_count())
 
+
 def get_llm(model, cache_dir="llm_weights"):
     model = AutoModelForCausalLM.from_pretrained(
-        model, 
-        torch_dtype=torch.float16, 
-        cache_dir=cache_dir, 
-        low_cpu_mem_usage=True, 
+        model,
+        torch_dtype=torch.float16,
+        cache_dir=cache_dir,
+        low_cpu_mem_usage=True,
         device_map="auto"
     )
 
     model.seqlen = 2048
     return model
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -33,7 +35,7 @@ def main():
     parser.add_argument('--sparsity_ratio', type=float, default=0, help='Sparsity level')
     parser.add_argument("--sparsity_type", type=str, choices=["unstructured", "4:8", "2:4"])
     parser.add_argument("--prune_method", type=str, choices=["magnitude", "wanda", "sparsegpt"])
-    parser.add_argument("--cache_dir", default=None, type=str )
+    parser.add_argument("--cache_dir", default=None, type=str)
     parser.add_argument('--use_variant', action="store_true", help="whether to use the wanda variant described in the appendix")
     parser.add_argument('--save', type=str, default=None, help='Path to save results.')
     parser.add_argument('--save_model', type=str, default=None, help='Path to save the pruned model.')
@@ -56,9 +58,12 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False)
 
     device = torch.device("cuda:0")
-    if "30b" in args.model or "65b" in args.model: # for 30b and 65b we use device_map to load onto multiple A6000 GPUs, thus the processing here.
+    if "30b" in args.model or "65b" in args.model:  # for 30b and 65b we use device_map to load onto multiple A6000 GPUs, thus the processing here.
         device = model.hf_device_map["lm_head"]
     print("use device ", device)
+
+    sparsity_ratio_original = check_sparsity(model)
+    print('original sparsity: ', sparsity_ratio_original)
 
     if args.sparsity_ratio != 0:
         print("pruning starts")
@@ -70,10 +75,10 @@ def main():
             prune_sparsegpt(args, model, tokenizer, device, prune_n=prune_n, prune_m=prune_m)
 
     ################################################################
-    print("*"*30)
+    print("*" * 30)
     sparsity_ratio = check_sparsity(model)
     print(f"sparsity sanity check {sparsity_ratio:.4f}")
-    print("*"*30)
+    print("*" * 30)
     ################################################################
     ppl = eval_ppl(model, tokenizer, device)
     print(f"ppl on wikitext {ppl}")
@@ -88,6 +93,7 @@ def main():
     if args.save_model:
         model.save_pretrained(args.save_model)
         tokenizer.save_pretrained(args.save_model)
+
 
 if __name__ == '__main__':
     main()
