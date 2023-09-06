@@ -13,6 +13,20 @@ print('transformers', version('transformers'))
 print('accelerate', version('accelerate'))
 print('# of gpus: ', torch.cuda.device_count())
 
+def to_encoded_array(tensor_or_array):
+    if isinstance(tensor_or_array, torch.Tensor):
+        array = tensor_or_array.cpu().contiguous().numpy()
+    else:
+        array = tensor_or_array
+    shape = array.shape
+    encoded_array = np.packbits(array.reshape(-1))
+    return encoded_array, list(shape)
+
+def from_encoded_array(encoded_array, shape):
+    array = np.unpackbits(encoded_array)
+    tensor = torch.from_numpy(array)
+    return tensor[:np.prod(shape)].reshape(shape)
+
 
 def get_llm(model, cache_dir="llm_weights"):
     model = AutoModelForCausalLM.from_pretrained(
@@ -78,7 +92,11 @@ def main():
     if not os.path.exists(args.save):
         os.makedirs(args.save)
     if mask_dict is not None:
-        np.savez_compressed(os.path.join(args.save, 'mask_dict.npz'), **mask_dict)
+        print('Saving mask dict...')
+        encoded_mask_dict = {}
+        for k, v in mask_dict.items():
+            encoded_mask_dict[k] = to_encoded_array(v)
+        torch.save(encoded_mask_dict, os.path.join(args.save, 'mask_dict.encoded_bytes.pt'))
 
     ################################################################
     print("*" * 30)
@@ -95,6 +113,7 @@ def main():
         print(f"{sparsity_ratio:.4f}\t{ppl:.4f}", file=f, flush=True)
 
     if args.save_model:
+        print('Saving model...')
         model.save_pretrained(args.save_model)
         tokenizer.save_pretrained(args.save_model)
 
