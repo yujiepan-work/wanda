@@ -13,6 +13,7 @@ print('transformers', version('transformers'))
 print('accelerate', version('accelerate'))
 print('# of gpus: ', torch.cuda.device_count())
 
+
 def to_encoded_array(tensor_or_array):
     if isinstance(tensor_or_array, torch.Tensor):
         array = tensor_or_array.cpu().contiguous().numpy()
@@ -21,6 +22,7 @@ def to_encoded_array(tensor_or_array):
     shape = array.shape
     encoded_array = np.packbits(array.reshape(-1))
     return encoded_array, list(shape)
+
 
 def from_encoded_array(encoded_array, shape):
     array = np.unpackbits(encoded_array)
@@ -34,7 +36,7 @@ def get_llm(model, cache_dir="llm_weights"):
         torch_dtype=torch.float16,
         cache_dir=cache_dir,
         low_cpu_mem_usage=True,
-        device_map="auto"
+        # device_map="auto" # avoids loading to gpu at this moment
     )
 
     model.seqlen = 2048
@@ -72,11 +74,13 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False)
 
     device = torch.device("cuda:0")
-    if "30b" in args.model or "65b" in args.model:  # for 30b and 65b we use device_map to load onto multiple A6000 GPUs, thus the processing here.
-        device = model.hf_device_map["lm_head"]
+    from collections import defaultdict
+    model.hf_device_map = defaultdict(lambda: 'cpu')
+    # if "30b" in args.model or "65b" in args.model:  # for 30b and 65b we use device_map to load onto multiple A6000 GPUs, thus the processing here.
+    #     device = model.hf_device_map["lm_head"]
     print("use device ", device)
 
-    sparsity_ratio_original = check_sparsity(model)
+    sparsity_ratio_original = check_sparsity(model, report_n_layers=5) # only check 5 layers to save time
     print('original sparsity: ', sparsity_ratio_original)
 
     mask_dict = None

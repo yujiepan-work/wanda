@@ -29,7 +29,7 @@ def find_layers(module, layers=[nn.Linear], name=''):
         ))
     return res
 
-def check_sparsity(model):
+def check_sparsity(model, report_n_layers=-1):
     use_cache = model.config.use_cache 
     model.config.use_cache = False 
 
@@ -51,6 +51,9 @@ def check_sparsity(model):
             sub_params += W.numel()
 
         print(f"layer {i} sparsity {float(sub_count)/sub_params:.6f}")
+        if report_n_layers > 0 and i > report_n_layers:
+            print('Skip checking the following layers to save time.')
+            break
 
     model.config.use_cache = use_cache 
     return float(count)/total_params 
@@ -63,6 +66,8 @@ def prepare_calibration_input(model, dataloader, device):
     # dev = model.hf_device_map["model.embed_tokens"]
     if "model.embed_tokens" in model.hf_device_map:
         device = model.hf_device_map["model.embed_tokens"]
+    assert 'llama' in str(model.__class__)
+    model.model.embed_tokens = model.model.embed_tokens.to(device)
 
     dtype = next(iter(model.parameters())).dtype
     inps = torch.zeros((128, model.seqlen, model.config.hidden_size), dtype=dtype, device=device)
@@ -79,13 +84,14 @@ def prepare_calibration_input(model, dataloader, device):
             cache['attention_mask'] = kwargs['attention_mask']
             cache['position_ids'] = kwargs['position_ids']
             raise ValueError
-    layers[0] = Catcher(layers[0])
+    layers[0] = Catcher(layers[0].to(device))
     for batch in dataloader:
         try:
             model(batch[0].to(device))
         except ValueError:
             pass 
-    layers[0] = layers[0].module
+    layers[0] = layers[0].module.cpu()
+    model.model.embed_tokens = model.model.embed_tokens.cpu()
 
     outs = torch.zeros_like(inps)
     attention_mask = cache['attention_mask']
@@ -141,6 +147,7 @@ def prune_wanda(args, model, tokenizer, device=torch.device("cuda:0"), prune_n=0
 
     for i in range(len(layers)):
         layer = layers[i]
+        layer = layer.to(device)
         subset = find_layers(layer)
 
         if f"model.layers.{i}" in model.hf_device_map:   ## handle the case for llama-30B and llama-65B, when the device map has multiple GPUs;
@@ -210,6 +217,7 @@ def prune_wanda(args, model, tokenizer, device=torch.device("cuda:0"), prune_n=0
             with torch.no_grad():
                 outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
         inps, outs = outs, inps
+        layer = layer.cpu()
 
     model.config.use_cache = use_cache 
     torch.cuda.empty_cache()
