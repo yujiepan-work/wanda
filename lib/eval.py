@@ -38,8 +38,8 @@ def eval_ppl_wikitext(model, testenc, bs=1, device=None):
 
     # Loop through each batch
     for i in range(0,nsamples,bs):
-        if i % 50 == 0:
-            print(f"sample {i}")
+        if i % 10 == 0:
+            print(f"sample {i}", flush=True)
 
         # Calculate end index
         j = min(i+bs, nsamples)
