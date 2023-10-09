@@ -108,13 +108,26 @@ def main():
     print(f"sparsity sanity check {sparsity_ratio:.4f}")
     print("*" * 30)
     ################################################################
-    ppl = eval_ppl(model, tokenizer, device)
-    print(f"ppl on wikitext {ppl}")
 
-    save_filepath = os.path.join(args.save, "log.txt")
-    with open(save_filepath, "w") as f:
-        print("actual_sparsity\tppl", file=f, flush=True)
-        print(f"{sparsity_ratio:.4f}\t{ppl:.4f}", file=f, flush=True)
+    try:
+        ppl = eval_ppl(model, tokenizer, device)
+        print(f"ppl on wikitext {ppl}")
+        save_filepath = os.path.join(args.save, "log.txt")
+        with open(save_filepath, "w") as f:
+            print("actual_sparsity\tppl", file=f, flush=True)
+            print(f"{sparsity_ratio:.4f}\t{ppl:.4f}", file=f, flush=True)
+    except Exception as e:
+        print(e)
+
+    try:
+        from eval_by_awq_metric import eval_by_awq_metric
+        import json
+        awq_result = eval_by_awq_metric(model, tokenizer, args.model)
+        save_filepath = os.path.join(args.save, "eval_by_awq_metrics.json")
+        with open(save_filepath, "w") as f:
+            json.dump(awq_result, f, indent=2)
+    except Exception as e:
+        print(e)
 
     if args.save_model:
         print('Saving model...')

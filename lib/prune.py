@@ -234,8 +234,11 @@ def prune_sparsegpt(args, model, tokenizer, dev, prune_n=0, prune_m=0):
     model.config.use_cache = False
     layers = model.model.layers
 
-    if "model.embed_tokens" in model.hf_device_map:
-        dev = model.hf_device_map["model.embed_tokens"]
+    # if "model.embed_tokens" in model.hf_device_map:
+    #     dev = model.hf_device_map["model.embed_tokens"]
+    # At this stage, lets use cpu to capture the input
+    model = model.cpu()
+    dev = torch.device('cpu')
 
     dtype = next(iter(model.parameters())).dtype
     inps = torch.zeros(
@@ -267,13 +270,12 @@ def prune_sparsegpt(args, model, tokenizer, dev, prune_n=0, prune_m=0):
     position_ids = cache['position_ids']
 
     print('Ready.')
+    dev = torch.device('cuda:0')
 
     for i in range(len(layers)):
         layer = layers[i]
-        if f"model.layers.{i}" in model.hf_device_map:
-            dev = model.hf_device_map[f"model.layers.{i}"]
-            print(f"layer {i} device {dev}")
-            inps, outs, attention_mask, position_ids = inps.to(dev), outs.to(dev), attention_mask.to(dev), position_ids.to(dev)
+        layer = layer.to(dev)
+        inps, outs, attention_mask, position_ids = inps.to(dev), outs.to(dev), attention_mask.to(dev), position_ids.to(dev)
 
         subset = find_layers(layer)
 
@@ -305,6 +307,7 @@ def prune_sparsegpt(args, model, tokenizer, dev, prune_n=0, prune_m=0):
         for j in range(args.nsamples):
             outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
 
+        layer = layer.cpu()
         layers[i] = layer 
         torch.cuda.empty_cache()
 
