@@ -121,7 +121,7 @@ def main():
         model = model.cuda()
         results = eval_wikitext(model, tokenizer, tasks=('wikitext',), limit=None)
         print(results)
-        with open(os.path.join(args.save, 'wikitext_result.json'), 'w') as f:
+        with open(os.path.join(args.save, 'eval_results.json'), 'w') as f:
             json.dump(results, f, indent=2)
         return
 
