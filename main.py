@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from importlib.metadata import version
+import json
 
 from lib.prune import prune_wanda, prune_magnitude, prune_sparsegpt, check_sparsity, find_layers
 from lib.eval import eval_ppl
@@ -55,7 +56,12 @@ def main():
     parser.add_argument('--use_variant', action="store_true", help="whether to use the wanda variant described in the appendix")
     parser.add_argument('--save', type=str, default=None, help='Path to save results.')
     parser.add_argument('--save_model', type=str, default=None, help='Path to save the pruned model.')
+    parser.add_argument('--save_mask_dict', type=int, default=1, help='1 for save mask dict; otherwise 0.')
+    parser.add_argument('--sparse_layer_names', type=str, default=None, help='up_proj,down_proj,gate_proj')
+    parser.add_argument('--lm_harness_eval_task', type=str, default=None, help='wikitext')
     args = parser.parse_args()
+    import json
+    print(json.dumps(vars(args), indent=2))
 
     # Setting seeds for reproducibility
     np.random.seed(args.seed)
@@ -95,7 +101,7 @@ def main():
 
     if not os.path.exists(args.save):
         os.makedirs(args.save)
-    if mask_dict is not None:
+    if mask_dict is not None and args.save_mask_dict == 1:
         print('Saving mask dict...')
         encoded_mask_dict = {}
         for k, v in mask_dict.items():
@@ -108,6 +114,16 @@ def main():
     print(f"sparsity sanity check {sparsity_ratio:.4f}")
     print("*" * 30)
     ################################################################
+
+    if args.lm_harness_eval_task == 'wikitext':
+        from eval_lm_harness import eval_wikitext
+        import json
+        model = model.cuda()
+        results = eval_wikitext(model, tokenizer, tasks=('wikitext',), limit=None)
+        print(results)
+        with open(os.path.join(args.save, 'wikitext_result.json'), 'w') as f:
+            json.dump(results, f, indent=2)
+        return
 
     try:
         ppl = eval_ppl(model, tokenizer, device)

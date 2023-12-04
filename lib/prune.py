@@ -8,7 +8,7 @@ from .data import get_loaders
 
 from pdb import set_trace as st 
 
-def find_layers(module, layers=[nn.Linear], name=''):
+def find_layers_original(module, layers=[nn.Linear], name=''):
     """
     Recursively find the layers of a certain type in a module.
 
@@ -24,10 +24,22 @@ def find_layers(module, layers=[nn.Linear], name=''):
         return {name: module}
     res = {}
     for name1, child in module.named_children():
-        res.update(find_layers(
+        res.update(find_layers_original(
             child, layers=layers, name=name + '.' + name1 if name != '' else name1
         ))
     return res
+
+
+def find_layers(module, sparse_layer_names=None):
+    subset = find_layers_original(module)
+    if sparse_layer_names is None:
+        return subset    
+    sparse_layer_names = str(sparse_layer_names).split(',')
+    new_subset = {}
+    for name, module in subset.items():
+        if any(x in name for x in sparse_layer_names):
+            new_subset[name] = module
+    return new_subset
 
 def check_sparsity(model, report_n_layers=-1):
     use_cache = model.config.use_cache 
@@ -113,7 +125,7 @@ def prune_magnitude(args, model, tokenizer, device=torch.device("cuda:0"), prune
 
     for i in range(len(layers)):
         layer = layers[i]
-        subset = find_layers(layer)
+        subset = find_layers(layer, args.sparse_layer_names)
 
         for name in subset:
             W = subset[name].weight.data 
@@ -148,7 +160,7 @@ def prune_wanda(args, model, tokenizer, device=torch.device("cuda:0"), prune_n=0
     for i in range(len(layers)):
         layer = layers[i]
         layer = layer.to(device)
-        subset = find_layers(layer)
+        subset = find_layers(layer, args.sparse_layer_names)
 
         if f"model.layers.{i}" in model.hf_device_map:   ## handle the case for llama-30B and llama-65B, when the device map has multiple GPUs;
             dev = model.hf_device_map[f"model.layers.{i}"]
@@ -277,7 +289,7 @@ def prune_sparsegpt(args, model, tokenizer, dev, prune_n=0, prune_m=0):
         layer = layer.to(dev)
         inps, outs, attention_mask, position_ids = inps.to(dev), outs.to(dev), attention_mask.to(dev), position_ids.to(dev)
 
-        subset = find_layers(layer)
+        subset = find_layers(layer, args.sparse_layer_names)
 
         gpts = {}
         for name in subset:
