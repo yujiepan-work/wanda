@@ -41,7 +41,7 @@ def find_layers(module, sparse_layer_names=None):
             new_subset[name] = module
     return new_subset
 
-def check_sparsity(model, report_n_layers=-1):
+def check_sparsity(model, report_n_layers=-1, sparse_layer_names=None):
     use_cache = model.config.use_cache 
     model.config.use_cache = False 
 
@@ -50,7 +50,7 @@ def check_sparsity(model, report_n_layers=-1):
     total_params = 0
     for i in range(len(layers)):
         layer = layers[i]
-        subset = find_layers(layer)
+        subset = find_layers(layer, sparse_layer_names)
 
         sub_count = 0
         sub_params = 0

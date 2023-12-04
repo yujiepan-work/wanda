@@ -110,7 +110,7 @@ def main():
 
     ################################################################
     print("*" * 30)
-    sparsity_ratio = check_sparsity(model)
+    sparsity_ratio = check_sparsity(model, sparse_layer_names=args.sparse_layer_names)
     print(f"sparsity sanity check {sparsity_ratio:.4f}")
     print("*" * 30)
     ################################################################
